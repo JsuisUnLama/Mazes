@@ -1,95 +1,99 @@
 #include <iostream>
 #include <cassert>
-#include <random>
+#include <vector>
+#include <experimental/random>
 
 #define B_SIZE 5 //size of a side of the square in pixel
 #define MAZE_WIDTH 200
 #define MAZE_LENGTH 200
+#define NB_NEIGHBOURS 4
 
 /* ------------------------------------------------------ */
 
 class Node{
 public:
-	Node(Type type = NORMAL): n_size(B_SIZE), n_type(type), n_cur_ngbs(0) {
-		switch (type){
-			case NORMAL:
-				n_max_ngbs = N_NB;
-				n_isfull = false;
-				n_has_been_visited = false;
-				n_ngbs = new Node[n_max_ngbs];
-				break;
-			case INNER_BORDER:
-				n_max_ngbs = IB_NB;
-				n_isfull = true;
-				n_has_been_visited = false;
-				n_ngbs = new Node[n_max_ngbs];
-				break;
-			case OUTER_BORDER: 
-				n_max_ngbs = OB_NB;
-				n_isfull = true;
-				n_has_been_visited = false;
-				n_ngbs = new Node[n_max_ngbs];
-				break;
-			case ENTRY:
-				n_max_ngbs = IB_NB;
-				n_isfull = false;
-				n_has_been_visited = true;
-				n_ngbs = new Node[n_max_ngbs];
-				break;
-			case EXIT: 
-				n_max_ngbs = IB_NB;
-				n_isfull = false;
-				n_has_been_visited = false;
-				n_ngbs = new Node[n_max_ngbs];
+	Node(int index): n_size(B_SIZE), n_nb_ngbs(NB_NEIGHBOURS), n_isfull(false), n_has_been_visited(false) { n_ngbs = std::vector<Node>(n_nb_ngbs); }
+
+	// operators
+	bool operator==(Node& n) { return n.n_index == n_index; }
+	bool operator==(Node&& n) { return n.n_index == n_index; }
+	bool operator!=(Node& n) { return n.n_index != n_index; }
+	bool operator!=(Node&& n) { return n.n_index != n_index; }
+	Node operator-(Node&& n) {
+		int i = 0;
+		for(auto ngb : n_ngbs){
+			if(n == ngb){
+				n_ngbs.erase(n_ngbs.begin()+i);
+				i++;
 			}
+		}
 	}
 
-	//getters
-	inline Type getNodeType() const { return n_type; }
-	inline int getCurrentNbgsNb() const { return n_cur_ngbs; }
-	inline bool isNodeFull() const { return n_isfull; }
-	inline bool hasBeenVisited() const { return n_has_been_visited; }
+	// getters
+	static inline int getNodeIndex() { return n_index; }
+	static Node getNeighbour(const int index) {
+		assert(index >= 0 && index < NB_NEIGHBOURS);
+		switch(index){
+			case 0: return n_ngbs.at(0);
+			case 1: return n_ngbs.at(1);
+			case 2: return n_ngbs.at(2);
+			case 3: return n_ngbs.at(3);
+			default: return *this;
+		} 
+	}
+	static inline bool isNodeFull() { return n_isfull; }
+	static inline bool hasBeenVisited() { return n_has_been_visited; }
+	static inline bool isDeadEnd() { return n_nb_ngbs == 0; }
 
-	//setters
-	inline void setNodeContentState(bool c_st) { n_isfull = st; }
-	inline void setNodeVisitState(bool v_st) { n_has_been_visited = st; }
+	// setters
+	static inline void setNodeContentState(bool c_st) { n_isfull = st; }
+	static inline void setNodeVisitState(bool v_st) { n_has_been_visited = st; }
 
 private:
-	enum Type { NORMAL, INNER_BORDER, OUTER_BORDER, ENTRY, EXIT };
-	enum Neighbours_nb { OB_NB = 0, IB_NB = 1, N_NB = 4 };
-
+	int n_index;
 	int n_size;
-	Type n_type; //0: normal; 1: border; 2: extreme border
-	Neighbours_nb n_max_ngbs;
-	int n_cur_ngbs;
-	bool n_isfull; //true -> full; false -> empty
-	bool n_has_been_visited; //true -> already visited; false -> not visited yet
-	Node * n_ngbs; 
+	int n_nb_ngbs;
+	bool n_isfull;
+	bool n_has_been_visited;
+	std::vector<Node&> n_ngbs; //order: up, down, left, right
 };
 
 class Maze{
 public:
-	Maze(): m_width(MAZE_WIDTH), m_length(MAZE_LENGTH) { m_arr = new Node [MAZE_LENGTH * MAZE_WIDTH / B_SIZE]; } 
-	Maze(int w, int l): m_width(w), m_length(l) { m_arr = new Node [w * l / B_SIZE]; }
-	~Maze() { delete[] m_arr; }
+	Maze(): m_width(MAZE_WIDTH), m_length(MAZE_LENGTH) { m_arr = std::vector<Node>(MAZE_LENGTH * MAZE_WIDTH / B_SIZE); } 
+	Maze(int w, int l): m_width(w), m_length(l) { m_arr = std::vector<Node>(w * l / B_SIZE); }
+	~Maze() { ~m_arr; }
 
-	//getters
-	inline int getMazeWidth() const { return m_width; }
-	inline int getMazeLength() const { return m_length; }
-	inline Node getNodeOfMaze(int i, int j) const { return m_arr[i*m_length+j]; }
+	// getters
+	inline int getMazeWidth() { return m_width; }
+	inline int getMazeLength() { return m_length; }
+	inline bool isOutOfBounds(int i, int j) { return (i < 0) || (j < 0) || (i >= m_length) || (j >= m_width ); }
+	Node getNodeOfMaze(int i, int j) { return m_arr.at(i*m_length+j); }
+	//Node getUpNeighbour(int i, int j) { getNodeOfMaze(i+1, j) }
+	//Node getDownNeighbour(int i, int j) { getNodeOfMaze(i-1, j) }
+	//Node getLeftNeighbour(int i, int j) { getNodeOfMaze(i, j-1) }
+	//Node getRightNeighbour(int i, int j) { getNodeOfMaze(i, j+1) }
+	inline Node getRandomNode() { return getNodeOfMaze(std::experimental::randint(0,m_length),std::experimental::randint(0,m_width)); } 
 
-	//printers
+	// printers
 	void printMaze(){
 		std::cout << "yes" << std::endl;
 	}
 
-	//generator ()
-	void generateMaze(){ 
+	// initializer
+	void initializeMaze(){ }
 
+	// generator
+	void generateMaze(){ 
+		/* start from random, make it visited
+		 * select a random unvisited neigh, make it visited
+		 * continue, asserting no univisited neigh is a dead end
+		 * when on a dead end, backtracks to an unvisited neigh and repeat
+		 */
 	}
 
 private:
 	int m_width;
 	int m_length;
-	Node * m_arr;
+	std::vector<Node> m_arr;
 };
